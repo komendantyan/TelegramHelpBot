@@ -23,6 +23,11 @@ USE_TOR = os.environ.get('USE_TOR')
 BASE_URL = "https://api.telegram.org/bot{}".format(TOKEN)
 
 
+def register_webhook():
+    URL = os.environ.get("WEBHOOK_URL")
+    print(post('setWebhook', url=URL))
+
+
 def post(method, **params):
     def encode(obj):
         if isinstance(obj, dict) and obj.get("@") == "json.dumps":
@@ -219,3 +224,7 @@ def handler(event, context):
     except Exception:
         alert(traceback.format_exc() + "\n\nbody:\n" + json.dumps(body, indent=2))
     return {"statusCode": 200}
+
+
+if __name__ == '__main__':
+    register_webhook()
