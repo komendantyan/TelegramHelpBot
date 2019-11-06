@@ -122,6 +122,8 @@ def process_help_command(body):
                 example: `/post getMe {}`
             /setobject key json_value - store value in object storage
             /getobject key - get value from object storage
+            /listobjects key - list stored values
+            /deleteobject key - delete stored value
     """
     chat_id = body['message']['chat']['id']
     send_message(
@@ -165,7 +167,11 @@ def process_setobject_command(body):
                       Key=f'{key}.json',
                       Body=json.dumps(value, separators=',:'))
 
-    send_message(chat_id=chat_id, text=f'Key {key} successfuly saved')
+    send_message(
+        chat_id=chat_id,
+        reply_to_message_id=body['message']['message_id'],
+        text=f'Key {key} successfuly saved'
+    )
 
 
 @bot.register_command("/getobject")
@@ -186,6 +192,43 @@ def process_getobject_command(body):
         chat_id=chat_id,
         reply_to_message_id=body['message']['message_id'],
         text=json.dumps(value, indent=2)
+    )
+
+
+@bot.register_command("/listobjects")
+def process_listobjects_command(body):
+    chat_id = body['message']['chat']['id']
+
+    from boto3.session import Session
+    session = Session(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    client = session.client(service_name='s3', endpoint_url=AWS_ENDPOINT)
+
+    response = client.list_objects(Bucket=AWS_BUCKET_NAME)
+    value = [obj['Key'][:-5] for obj in response.get('Contents', []) if obj['Key'].endswith('.json')]
+
+    send_message(
+        chat_id=chat_id,
+        reply_to_message_id=body['message']['message_id'],
+        text=json.dumps(value, indent=2)
+    )
+
+
+@bot.register_command("/deleteobject")
+def process_deleteobject_command(body):
+    chat_id = body['message']['chat']['id']
+
+    from boto3.session import Session
+    session = Session(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    client = session.client(service_name='s3', endpoint_url=AWS_ENDPOINT)
+
+    _, key = body['message']['text'].split(' ', 1)
+
+    client.delete_object(Bucket=AWS_BUCKET_NAME, Key=f'{key}.json')
+
+    send_message(
+        chat_id=chat_id,
+        reply_to_message_id=body['message']['message_id'],
+        text='done'
     )
 
 
