@@ -10,6 +10,13 @@ import requests
 TOKEN = os.environ['TELEGRAM_TOKEN']
 EMERGENCY_CHAT_ID = os.environ.get("EMERGENCY_CHAT_ID")
 ALLOWED_USERNAMES = os.environ.get("ALLOWED_USERNAMES", "").split()
+
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_BUCKET_NAME = os.environ.get('AWS_BUCKET_NAME')
+AWS_ENDPOINT = 'https://storage.yandexcloud.net'
+
+
 USE_TOR = os.environ.get('USE_TOR')
 
 
@@ -107,7 +114,9 @@ def process_help_command(body):
             /chat_id - print current chat_id
             /post <method> <params>
                 ask bot to make request with given method and params (params is json)
-                example: post getMe {}
+                example: `/post getMe {}`
+            /setobject key json_value - store value in object storage
+            /getobject key - get value from object storage
     """
     chat_id = body['message']['chat']['id']
     send_message(
@@ -133,6 +142,45 @@ def process_chat_id_command(body):
         chat_id=chat_id,
         reply_to_message_id=body['message']['message_id'],
         text=str(chat_id)
+    )
+
+
+@bot.register_command("/setobject")
+def process_setobject_command(body):
+    chat_id = body['message']['chat']['id']
+
+    _, key, value = body['message']['text'].split(' ', 2)
+    value = json.loads(value)
+
+    from boto3.session import Session
+    session = Session(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    client = session.client(service_name='s3', endpoint_url=AWS_ENDPOINT)
+
+    client.put_object(Bucket=AWS_BUCKET_NAME,
+                      Key=f'{key}.json',
+                      Body=json.dumps(value, separators=',:'))
+
+    send_message(chat_id=chat_id, text=f'Key {key} successfuly saved')
+
+
+@bot.register_command("/getobject")
+def process_getobject_command(body):
+    chat_id = body['message']['chat']['id']
+
+    _, key = body['message']['text'].split(' ', 1)
+
+    from boto3.session import Session
+    session = Session(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    client = session.client(service_name='s3', endpoint_url=AWS_ENDPOINT)
+
+    response = client.get_object(Bucket=AWS_BUCKET_NAME,
+                                 Key=f'{key}.json')
+    value = json.loads(response['Body'].read())
+
+    send_message(
+        chat_id=chat_id,
+        reply_to_message_id=body['message']['message_id'],
+        text=json.dumps(value, indent=2)
     )
 
 
